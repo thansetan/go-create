@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 )
 
@@ -46,6 +47,7 @@ func main() {
 	var (
 		err     error
 		dirName string
+		file    *os.File
 	)
 
 	flag.Parse()
@@ -56,6 +58,7 @@ func main() {
 
 	splittedProjectName := strings.Split(*projectName, "/")
 	dirName = splittedProjectName[len(splittedProjectName)-1]
+	cwd, _ := os.Getwd() // in case there's error, this will be used to delete the project dir
 
 	err = createDir(dirName)
 	if err != nil {
@@ -63,56 +66,66 @@ func main() {
 			fmt.Printf("Directory %s already exist!\n", dirName)
 			os.Exit(1)
 		}
-		fmt.Println(err.Error())
-		panic("failed to create directory")
+		panic(err)
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("An error has occured: %s\nAborting and removing directory: %q for project: %q\n", r, dirName, *projectName)
+
+			if file != nil {
+				file.Close()
+			}
+
+			os.Chdir(cwd)
+			err := os.RemoveAll(path.Join(cwd, dirName))
+			if err != nil {
+				fmt.Printf("Error when trying to remove directory: %s\n", err.Error())
+			}
+		}
+	}()
 
 	err = os.Chdir(dirName)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
 	err = initGoProject(*projectName)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
 	goVersion, err := getGoVersion()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
 	createDirFromSlice(mainDirList)
 
-	_, err = createFile(".env")
+	file, err = createFile(".env")
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
 	os.Chdir("cmd")
 
 	err = createDir("app")
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		fmt.Println("2")
+		panic(err)
 	}
 
 	os.Chdir("app")
 
-	mainDotGo, err := createFile("main.go")
+	file.Close() // .env needs to be closed manually
+	file, err = createFile("main.go")
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
-	err = writeToFile(mainDotGo, mainDotGoContent)
+	err = writeToFile(file, mainDotGoContent)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 
 	os.Chdir("../../internal")
@@ -126,13 +139,16 @@ func main() {
 	createDirFromSlice(infrastructureDirList)
 
 	os.Chdir("../../")
-	dockerFile, err := os.Create("Dockerfile")
+
+	file, err = os.Create("Dockerfile")
 	if err != nil {
-		fmt.Println(err.Error())
+		panic(err)
 	}
 
 	dockerFileContent = strings.Replace(dockerFileContent, "GO_VERSION", goVersion, 1)
-	writeToFile(dockerFile, dockerFileContent)
+	writeToFile(file, dockerFileContent)
+
+	fmt.Printf("Direcory: %q for project: %q created!\n", dirName, *projectName)
 }
 
 func createDir(dirName string) error {
@@ -152,7 +168,6 @@ func getGoVersion() (string, error) {
 	}
 
 	defer goModFile.Close()
-
 	fileScanner := bufio.NewReader(goModFile)
 	// Skip 2 lines
 	fileScanner.ReadLine() // this line is the module name
