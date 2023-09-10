@@ -45,5 +45,5 @@ go install github.com/thansetan/go-create@latest
 
 ## Notes:
 
-1. If no project name is specified, it will create a project named "my-project."
+1. If no project name is specified, it will create a project named "my-project".
 2. If the `<project-name>` is specified as `github.com/username/project-name` (e.g., `go-create github.com/username/project-name`), the project directory name will be `project-name`, but the module name will still be `github.com/username/project-name`.
