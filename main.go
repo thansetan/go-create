@@ -148,7 +148,7 @@ func main() {
 	dockerFileContent = strings.Replace(dockerFileContent, "GO_VERSION", goVersion, 1)
 	writeToFile(file, dockerFileContent)
 
-	fmt.Printf("Direcory: %q for project: %q created!\n", dirName, *projectName)
+	fmt.Printf("Directory: %q for project: %q created!\n", dirName, *projectName)
 }
 
 func createDir(dirName string) error {
